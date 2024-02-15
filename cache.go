@@ -13,14 +13,14 @@ type Config struct {
 
 type Service interface {
 	SetGlobalTTL(ttl time.Duration) error
-	Set(nameSpace, key string, value interface{}, duration time.Duration) error
-	GetKeysByNamespace(nameSpace string) []string
-	GetNamespaces() []string
-	Get(nameSpace, key string) (interface{}, error)
+	Set(primaryKey, key string, value interface{}, duration time.Duration) error
+	GetKeysByPrimaryKey(primaryKey string) []string
+	GetPrimaryKeys() []string
+	Get(primaryKey, key string) (interface{}, error)
 	GetAll() []interface{}
-	GetAllByPatternByNamespace(nameSpace, key string) ([]interface{}, error)
-	GetItems(nameSpace, key string) *Item
-	GetAllByNamespace(nameSpace string) []interface{}
+	GetAllByPatternByPrimaryKey(primaryKey, key string) ([]interface{}, error)
+	GetItems(primaryKey, key string) *Item
+	GetAllByPrimaryKey(primaryKey string) []interface{}
 	GetByKey(key string) interface{}
 	// Count() int
 }

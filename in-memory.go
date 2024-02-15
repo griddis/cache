@@ -21,8 +21,8 @@ type inmemory struct {
 }
 
 type Keys struct {
-	NameSpace string
-	Key       string
+	PrimaryKey string
+	Key        string
 }
 
 type Item struct {
@@ -53,10 +53,10 @@ func NewServiceInMemory(ctx context.Context, cfg *Config) Service {
 	return &cache
 }
 
-//1189 ns
-func (s *inmemory) Get(nameSpace, key string) (interface{}, error) {
+// 1189 ns
+func (s *inmemory) Get(primaryKey, key string) (interface{}, error) {
 	s.s.RLock()
-	item, found := s.items[nameSpace][key]
+	item, found := s.items[primaryKey][key]
 	s.s.RUnlock()
 
 	if !found {
@@ -71,36 +71,36 @@ func (s *inmemory) Get(nameSpace, key string) (interface{}, error) {
 	return item.Value, nil
 }
 
-//287M ns
-func (s *inmemory) GetKeysByNamespace(nameSpace string) (keys []string) {
+// 287M ns
+func (s *inmemory) GetKeysByPrimaryKey(primaryKey string) (keys []string) {
 	//reflect.ValueOf(s.items).MapKeys()
 	s.s.RLock()
-	for key := range s.items[nameSpace] {
+	for key := range s.items[primaryKey] {
 		keys = append(keys, key)
 	}
 	s.s.RUnlock()
 	return keys
 }
 
-//680 ns
-func (s *inmemory) GetNamespaces() (nameSpace []string) {
-	nameSpace = make([]string, 0, len(s.items))
+// 680 ns
+func (s *inmemory) GetPrimaryKeys() (primaryKey []string) {
+	primaryKey = make([]string, 0, len(s.items))
 	s.s.RLock()
 	for ns := range s.items {
-		nameSpace = append(nameSpace, ns)
+		primaryKey = append(primaryKey, ns)
 	}
 	s.s.RUnlock()
-	return nameSpace
+	return primaryKey
 }
 
-func (s *inmemory) GetItems(nameSpace, key string) *Item {
+func (s *inmemory) GetItems(primaryKey, key string) *Item {
 	s.s.RLock()
-	item := s.items[nameSpace][key]
+	item := s.items[primaryKey][key]
 	s.s.RUnlock()
 	return item
 }
 
-//188M ns
+// 188M ns
 func (s *inmemory) GetAll() []interface{} {
 	var ret []interface{}
 	s.s.RLock()
@@ -118,15 +118,15 @@ func (s *inmemory) GetAll() []interface{} {
 	return ret
 }
 
-//779 ns
-func (s *inmemory) GetAllByPatternByNamespace(nameSpace, key string) ([]interface{}, error) { //namespase
+// 779 ns
+func (s *inmemory) GetAllByPatternByPrimaryKey(primaryKey, key string) ([]interface{}, error) { //namespase
 	r, err := regexp.Compile(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetAllByPattern error compile regexp")
 	}
 	var ret []interface{}
 	s.s.RLock()
-	if item, ok := s.items[nameSpace]; ok {
+	if item, ok := s.items[primaryKey]; ok {
 		for k, it := range item {
 			if !r.MatchString(k) {
 				continue
@@ -143,11 +143,11 @@ func (s *inmemory) GetAllByPatternByNamespace(nameSpace, key string) ([]interfac
 	return ret, nil
 }
 
-//23.29 ns
-func (s *inmemory) GetAllByNamespace(nameSpace string) []interface{} {
+// 23.29 ns
+func (s *inmemory) GetAllByPrimaryKey(primaryKey string) []interface{} {
 	var ret []interface{}
 	s.s.RLock()
-	if item, ok := s.items[nameSpace]; ok {
+	if item, ok := s.items[primaryKey]; ok {
 		for _, it := range item {
 			if it.Expiration > 0 {
 				if time.Now().UnixNano() > it.Expiration {
@@ -161,7 +161,7 @@ func (s *inmemory) GetAllByNamespace(nameSpace string) []interface{} {
 	return ret
 }
 
-//23.68 ns
+// 23.68 ns
 func (s *inmemory) GetByKey(key string) interface{} {
 	var ret interface{}
 	s.s.RLock()
@@ -179,8 +179,8 @@ func (s *inmemory) GetByKey(key string) interface{} {
 	return ret
 }
 
-//223 ns
-func (s *inmemory) Set(nameSpace, key string, value interface{}, duration time.Duration) error {
+// 223 ns
+func (s *inmemory) Set(primaryKey, key string, value interface{}, duration time.Duration) error {
 	var expiration int64
 	if duration == 0 {
 		duration = s.defaultExpiration
@@ -190,7 +190,7 @@ func (s *inmemory) Set(nameSpace, key string, value interface{}, duration time.D
 		expiration = time.Now().Add(duration).UnixNano()
 	}
 	s.s.Lock()
-	item, ok := s.items[nameSpace]
+	item, ok := s.items[primaryKey]
 	if !ok {
 		item = map[string]*Item{}
 	}
@@ -199,7 +199,7 @@ func (s *inmemory) Set(nameSpace, key string, value interface{}, duration time.D
 		Expiration: expiration,
 		Created:    time.Now(),
 	}
-	s.items[nameSpace] = item
+	s.items[primaryKey] = item
 	s.s.Unlock()
 
 	return nil
@@ -235,7 +235,7 @@ func (s *inmemory) expiredKeys() (keys []Keys) {
 	var item map[string]*Item
 	var key Keys
 	s.s.RLock()
-	for key.NameSpace, item = range s.items {
+	for key.PrimaryKey, item = range s.items {
 		for key.Key, it = range item {
 			if time.Now().UnixNano() > it.Expiration && it.Expiration > 0 {
 				keys = append(keys, key)
@@ -250,8 +250,8 @@ func (s *inmemory) expiredKeys() (keys []Keys) {
 func (s *inmemory) clearItems(keys []Keys) {
 	s.s.Lock()
 	for _, k := range keys {
-		s.logger.Debug("clean cache", "nameSpace", k.NameSpace, "key", k.Key)
-		delete(s.items[k.NameSpace], k.Key)
+		s.logger.Debug("clean cache", "primaryKey", k.PrimaryKey, "key", k.Key)
+		delete(s.items[k.PrimaryKey], k.Key)
 	}
 	s.s.Unlock()
 }
